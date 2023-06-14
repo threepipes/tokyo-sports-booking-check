@@ -1,0 +1,8 @@
+/node_modules/
+/build/
+/.bin/
+/tmp/
+/localtest/
+.env
+test.html
+.clasp.json
