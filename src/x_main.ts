@@ -33,8 +33,8 @@ function main() {
 }
 
 function getDiffs(): DiffGroup[] {
-  // const html = getCalendarPage();
-  const html = HtmlService.createHtmlOutputFromFile("test.html").getContent(); // DEBUG
+  const html = getCalendarPage();
+  // const html = HtmlService.createHtmlOutputFromFile("test.html").getContent(); // DEBUG
   const calendars = getCalendarInfo(html);
 
   const diffGroups: DiffGroup[] = [];
@@ -133,5 +133,5 @@ function getNotifierClient(): Notifier {
 
 function createDiffMessage(diffs: DiffGroup[]): string {
   const diffsMsg = diffs.map(d => d.toString()).join("\n\n");
-  return `予約情報に変更が見つかりました\n${diffsMsg}`;
+  return `施設空き情報に変更が見つかりました\n${diffsMsg}`;
 }
