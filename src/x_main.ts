@@ -25,6 +25,8 @@ function main() {
     if (diffGroups.length > 0) {
       const message = createDiffMessage(diffGroups);
       notifier.send(message);
+    } else {
+      Logger.log("diffなし");
     }
   } catch (error) {
     Logger.log(error);
@@ -40,9 +42,11 @@ function getDiffs(): DiffGroup[] {
   const diffGroups: DiffGroup[] = [];
   calendars.forEach(newCal => {
     const old = Calendar.restore(newCal.getName());
-    const ds = old.compare(newCal, ["19:00～21:00"])
-    if (ds.length > 0) {
-      diffGroups.push(new DiffGroup(newCal.getName(), ds));
+    if (old !== null) {
+      const ds = old.compare(newCal, ["19:00～21:00"])
+      if (ds.length > 0) {
+        diffGroups.push(new DiffGroup(newCal.getName(), ds));
+      }
     }
     newCal.store();
   });

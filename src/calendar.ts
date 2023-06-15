@@ -29,13 +29,22 @@ export class Diff {
   }
 }
 
+function isInteger(v: string): boolean {
+  const p = parseInt(v, 10);
+  return !isNaN(p);
+}
+
 function needAlert(fromAvailability: string, toAvailability: string): boolean {
   if (fromAvailability === SCHEDULE_FULL) {
-    return toAvailability !== SCHEDULE_FULL && toAvailability !== SCHEDULE_EXPIRED;
+    return isInteger(toAvailability);
   } else if (toAvailability === SCHEDULE_FULL) {
-    return fromAvailability !== SCHEDULE_FULL && fromAvailability !== SCHEDULE_EXPIRED;
+    return isInteger(fromAvailability);
   }
   return false;
+}
+
+function columnId(id: number): string {
+  return String.fromCharCode("A".charCodeAt(0) + id);
 }
 
 export class Calendar {
@@ -81,26 +90,32 @@ export class Calendar {
 
   store() {
     Logger.log(`storing ${this.name}`);
-    const sheet = this.getNewSheet();
-
-    sheet.appendRow(['date', ...this.scheduleNames]);
+    
+    const rows: string[][] = [];
+    rows.push(['date', ...this.scheduleNames]);
     
     this.days.forEach((day) => {
       let row = [day.date];
       day.schedule.forEach((availability) => {
         row.push(availability.value);
       });
-      sheet.appendRow(row);
+      rows.push(row);
     });
+    
+    const sheet = this.getNewSheet();
+    const colId = columnId(rows[0].length - 1);
+    const range = sheet.getRange(`A1:${colId}${rows.length}`);
+    range.setValues(rows);
 
     Logger.log("completed storing");
   }
 
-  static restore(name: string): Calendar {
+  static restore(name: string): Calendar | null {
     Logger.log(`restoring ${name}`);
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
     if (sheet === null) {
-      throw Error(`failed to find sheet: ${name}`);
+      Logger.log(`failed to find sheet: ${name}`);
+      return null;
     }
     const days: DayAvailability[] = [];
 
