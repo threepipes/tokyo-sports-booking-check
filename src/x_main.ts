@@ -1,20 +1,52 @@
 import { Calendar, Diff } from "./calendar";
 import { Crawler } from "./crawler";
 import { Parser } from "./htmlParser";
+import { Notifier } from "./notification";
+
+class DiffGroup {
+  private name: string;
+  private diffs: Diff[];
+
+  constructor(name: string, diffs: Diff[]) {
+    this.name = name;
+    this.diffs = diffs;
+  }
+
+  toString(): string {
+    const diffStr = this.diffs.map(d => d.toString()).join("\n")
+    return `[${this.name}]\n${diffStr}`
+  }
+}
 
 function main() {
+  const notifier = getNotifierClient();
+  try {
+    const diffGroups = getDiffs();
+    if (diffGroups.length > 0) {
+      const message = createDiffMessage(diffGroups);
+      notifier.send(message);
+    }
+  } catch (error) {
+    Logger.log(error);
+    notifier.send(`エラーが発生しました。 ${error}`);
+  }
+}
+
+function getDiffs(): DiffGroup[] {
   // const html = getCalendarPage();
   const html = HtmlService.createHtmlOutputFromFile("test.html").getContent(); // DEBUG
   const calendars = getCalendarInfo(html);
 
-  const diffs: Diff[] = [];
+  const diffGroups: DiffGroup[] = [];
   calendars.forEach(newCal => {
     const old = Calendar.restore(newCal.getName());
     const ds = old.compare(newCal, ["19:00～21:00"])
-    diffs.push(...ds);
+    if (ds.length > 0) {
+      diffGroups.push(new DiffGroup(newCal.getName(), ds));
+    }
     newCal.store();
   });
-  diffs.forEach(d => Logger.log(d.toString()));
+  return diffGroups;
 }
 
 function getCalendarPage(): string {
@@ -81,7 +113,25 @@ function parseDates(table: GoogleAppsScript.XML_Service.Element): string[] {
   return dates.map(e => e.getValue().trim());
 }
 
-export function getPayload(name: string): string {
+function getPayload(name: string): string {
   // @ts-ignore
   return payloads[name].map(v => `${v.key}=${v.value}`).join("&");
+}
+
+function getNotifierClient(): Notifier {
+  const properties = PropertiesService.getScriptProperties();
+  const botToken = properties.getProperty("SLACK_BOT_TOKEN");
+  if (botToken === null) {
+    throw Error("SLACK_BOT_TOKEN is not found");
+  }
+  const channel = properties.getProperty("NOTIFICATION_CHANNEL");
+  if (channel === null) {
+    throw Error("NOTIFICATION_CHANNEL is not found");
+  }
+  return new Notifier(botToken, channel);
+}
+
+function createDiffMessage(diffs: DiffGroup[]): string {
+  const diffsMsg = diffs.map(d => d.toString()).join("\n\n");
+  return `予約情報に変更が見つかりました\n${diffsMsg}`;
 }
