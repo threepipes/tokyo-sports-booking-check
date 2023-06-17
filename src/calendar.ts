@@ -1,10 +1,31 @@
-interface Availability {
-  time: string; // format: "HH:mm - HH:mm"
-  value: string; // "-" | "x" | number
-}
-
 const SCHEDULE_EXPIRED = "－";
 const SCHEDULE_FULL = "×";
+
+class Availability {
+  private time: string; // format: "HH:mm - HH:mm"
+  private value: string; // "-" | "x" | number
+  constructor(time: string, value: string) {
+    this.time = time.replace(/([0-9]+:[0-9]+).([0-9]+:[0-9]+)/gi, "$1-$2")
+    this.value = value;
+  }
+
+  getTime(): string {
+    return this.time;
+  }
+
+  getAvailability(): string {
+    return this.value;
+  }
+
+  isAvailable(): boolean {
+    const p = parseInt(this.value, 10);
+    return !isNaN(p);
+  }
+
+  isFull(): boolean {
+    return this.value === SCHEDULE_FULL;
+  }
+}
 
 interface DayAvailability {
   date: string; // format: "<month>/<date>(day)"
@@ -29,18 +50,8 @@ export class Diff {
   }
 }
 
-function isInteger(v: string): boolean {
-  const p = parseInt(v, 10);
-  return !isNaN(p);
-}
-
-function needAlert(fromAvailability: string, toAvailability: string): boolean {
-  if (fromAvailability === SCHEDULE_FULL) {
-    return isInteger(toAvailability);
-  } else if (toAvailability === SCHEDULE_FULL) {
-    return isInteger(fromAvailability);
-  }
-  return false;
+function needAlert(from: Availability, to: Availability): boolean {
+  return from.isFull() && to.isAvailable() || to.isFull() && from.isAvailable();
 }
 
 function columnId(id: number): string {
@@ -68,10 +79,9 @@ export class Calendar {
     const scheduleNames = rows[1].getChildren("td").map(e => e.getValue().trim());
     const schedules = rows.slice(2).map((d, i) => ({
       date: dates[i],
-      schedule: d.getChildren("td").map(v => v.getValue().trim()).map((v, j) => ({
-        time: scheduleNames[j],
-        value: v,
-      } as Availability))
+      schedule: d.getChildren("td")
+        .map(v => v.getValue().trim())
+        .map((v, j) => (new Availability(scheduleNames[j], v)))
     } as DayAvailability));
     return new Calendar(courtName, schedules, scheduleNames);
   }
@@ -97,7 +107,7 @@ export class Calendar {
     this.days.forEach((day) => {
       let row = [day.date];
       day.schedule.forEach((availability) => {
-        row.push(availability.value);
+        row.push(availability.getAvailability());
       });
       rows.push(row);
     });
@@ -132,10 +142,7 @@ export class Calendar {
       };
 
       for(let i = 1; i < row.length; i++) {
-        dayAvailability.schedule.push({
-          time: scheduleNames[i - 1],
-          value: row[i],
-        });
+        dayAvailability.schedule.push(new Availability(scheduleNames[i-1], row[i]));
       }
       
       days.push(dayAvailability);
@@ -153,16 +160,16 @@ export class Calendar {
     const diffs: Diff[] = [];
     this.days.forEach((d, i) => {
       d.schedule.forEach((s, j) => {
-        if (!targetSchedules.includes(s.time)) {
+        if (!targetSchedules.includes(s.getTime())) {
           return;
         }
         const to = calendar.days[i].schedule[j];
-        if (needAlert(s.value, to.value)) {
+        if (needAlert(s, to)) {
           diffs.push(new Diff(
             d.date,
-            s.time,
-            s.value,
-            to.value,
+            s.getTime(),
+            s.getAvailability(),
+            to.getAvailability(),
           ))
         }
       });

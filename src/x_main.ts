@@ -43,7 +43,7 @@ function getDiffs(): DiffGroup[] {
   calendars.forEach(newCal => {
     const old = Calendar.restore(newCal.getName());
     if (old !== null) {
-      const ds = old.compare(newCal, ["19:00～21:00"])
+      const ds = old.compare(newCal, ["19:00-21:00"])
       if (ds.length > 0) {
         diffGroups.push(new DiffGroup(newCal.getName(), ds));
       }
