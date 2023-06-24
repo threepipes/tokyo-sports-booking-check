@@ -77,15 +77,25 @@ function getCalendarPages(): CalendarPage[] {
   let ym: string[] = [];
   for (let i = 1; i <= MAX_RETRY; i++) {
     crawler.request("get", "https://yoyaku.sports.metro.tokyo.lg.jp/web/index.jsp", undefined);
-    Utilities.sleep(2000);
+    Utilities.sleep(1000);
     crawler.request("post",
       "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchVacantAction.do",
       {displayNo: "pawae1000"},
     );
-    Utilities.sleep(3000);
-    const condPage = crawler.request("post",
+    Utilities.sleep(1000);
+    crawler.request("post",
       "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTIM_Action.do",
       getPayload("searchCondition"),
+    );
+    Utilities.sleep(1000);
+    crawler.request("post",
+      "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchPpsAction.do",
+      getPayload("selectSports"),
+    );
+    Utilities.sleep(1000);
+    const condPage = crawler.request("post",
+      "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchMultipleAction.do",
+      getPayload("searchConditionWithSports"),
     );
     try {
       ym = getDispYM(condPage);
@@ -99,16 +109,6 @@ function getCalendarPages(): CalendarPage[] {
     }
     break;
   }
-  Utilities.sleep(1000);
-  crawler.request("post",
-    "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchPpsAction.do",
-    getPayload("selectSports"),
-  );
-  Utilities.sleep(1000);
-  crawler.request("post",
-    "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchMultipleAction.do",
-    getPayload("searchConditionWithSports"),
-  );
   const contents: CalendarPage[] = [];
   ym.forEach(ym => {
     const year = ym.substring(0, 4);
