@@ -132,6 +132,7 @@ function getDispYM(html: string): string[] {
   if (matches.length > 0) {
     return matches;
   } else {
+    Logger.log(html);
     throw new Error('No displayed months found');
   }
 }
