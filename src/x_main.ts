@@ -107,7 +107,7 @@ function getCalendarPages(): CalendarPage[] {
     getPayload("selectSports"),
   );
   Utilities.sleep(1000);
-  const condPage = crawler.request("post",
+  crawler.request("post",
     "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchMultipleAction.do",
     getPayload("searchConditionWithSports"),
   );
