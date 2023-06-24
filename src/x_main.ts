@@ -49,6 +49,15 @@ function getDiffs(): DiffGroup[] {
       const old = Calendar.restore(newCal.getName());
       if (old !== null) {
         const ds = old.compare(newCal, [
+          /*
+            [検知対象日時]
+            ScheduleCondition(weekday, time)
+            - weekday と time の AND (積集合) 条件で指定する
+            - weekday: 曜日 (月～日)
+            - time: 利用時間 (HH:mm-HH:mm の形式で、07:00-09:00 から 19:00-21:00 まで)
+            - * はすべてを表す
+            ScheduleCondition 同士は OR (和集合) 条件で結合する
+          */
           new ScheduleCondition("*", "19:00-21:00"),
           new ScheduleCondition("土", "*"),
           new ScheduleCondition("日", "*"),
