@@ -78,27 +78,19 @@ function getCalendarPages(): CalendarPage[] {
   for (let i = 1; i <= MAX_RETRY; i++) {
     crawler.request("get", "https://yoyaku.sports.metro.tokyo.lg.jp/web/index.jsp", undefined);
     Utilities.sleep(1000);
-    crawler.request("post",
+    const preSearchPage = crawler.request("post",
       "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchVacantAction.do",
       {displayNo: "pawae1000"},
     );
+    const searchPath = getSearchPagePath(preSearchPage);
     Utilities.sleep(1000);
-    crawler.request("post",
-      "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTIM_Action.do",
+    const searchPage = crawler.request("post",
+      "https://yoyaku.sports.metro.tokyo.lg.jp" + searchPath,
       getPayload("searchCondition"),
     );
-    Utilities.sleep(1000);
-    crawler.request("post",
-      "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchPpsAction.do",
-      getPayload("selectSports"),
-    );
-    Utilities.sleep(1000);
-    const condPage = crawler.request("post",
-      "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchMultipleAction.do",
-      getPayload("searchConditionWithSports"),
-    );
+
     try {
-      ym = getDispYM(condPage);
+      ym = getDispYM(searchPage);
     } catch(e) {
       Utilities.sleep(10000);
       Logger.log(`Error occured: ${e}. Retry...`)
@@ -109,6 +101,16 @@ function getCalendarPages(): CalendarPage[] {
     }
     break;
   }
+  Utilities.sleep(1000);
+  crawler.request("post",
+    "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchPpsAction.do",
+    getPayload("selectSports"),
+  );
+  Utilities.sleep(1000);
+  const condPage = crawler.request("post",
+    "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchMultipleAction.do",
+    getPayload("searchConditionWithSports"),
+  );
   const contents: CalendarPage[] = [];
   ym.forEach(ym => {
     const year = ym.substring(0, 4);
@@ -133,6 +135,16 @@ function getCalendarPages(): CalendarPage[] {
     );
   });
   return contents;
+}
+
+function getSearchPagePath(html: string): string {
+  const pattern = /var gRsvWTransInstSrchMultipleAction ?= ?'([^']+)';/g;
+  const match = pattern.exec(html);
+  if (match !== null) {
+    return match[1];
+  } else {
+    throw new Error('No match found');
+  }
 }
 
 function getDispYM(html: string): string[] {
