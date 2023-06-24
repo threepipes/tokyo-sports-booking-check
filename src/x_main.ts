@@ -1,4 +1,4 @@
-import { Calendar, Diff } from "./calendar";
+import { Calendar, Diff, ScheduleCondition } from "./calendar";
 import { Crawler } from "./crawler";
 import { Parser } from "./htmlParser";
 import { Notifier } from "./notification";
@@ -35,25 +35,41 @@ function main() {
 }
 
 function getDiffs(): DiffGroup[] {
-  const html = getCalendarPage();
-  // const html = HtmlService.createHtmlOutputFromFile("test.html").getContent(); // DEBUG
-  const calendars = getCalendarInfo(html);
-
+  const pages = getCalendarPages();
+  // const pages = [{ // DEBUG
+  //   html: HtmlService.createHtmlOutputFromFile("test.html").getContent(),
+  //   year: "2023",
+  //   month: "6",
+  // }];
   const diffGroups: DiffGroup[] = [];
-  calendars.forEach(newCal => {
-    const old = Calendar.restore(newCal.getName());
-    if (old !== null) {
-      const ds = old.compare(newCal, ["19:00-21:00"])
-      if (ds.length > 0) {
-        diffGroups.push(new DiffGroup(newCal.getName(), ds));
+  pages.forEach(p => {
+    const calendars = getCalendarInfo(p);
+
+    calendars.forEach(newCal => {
+      const old = Calendar.restore(newCal.getName());
+      if (old !== null) {
+        const ds = old.compare(newCal, [
+          new ScheduleCondition("*", "19:00-21:00"),
+          new ScheduleCondition("土", "*"),
+          new ScheduleCondition("日", "*"),
+        ]);
+        if (ds.length > 0) {
+          diffGroups.push(new DiffGroup(newCal.getName(), ds));
+        }
       }
-    }
-    newCal.store();
+      newCal.store();
+    });
   });
   return diffGroups;
 }
 
-function getCalendarPage(): string {
+interface CalendarPage {
+  html: string;
+  year: string;
+  month: string;
+}
+
+function getCalendarPages(): CalendarPage[] {
   const crawler = new Crawler();
   
   crawler.request("get", "https://yoyaku.sports.metro.tokyo.lg.jp/web/index.jsp", undefined);
@@ -63,10 +79,11 @@ function getCalendarPage(): string {
     {displayNo: "pawae1000"},
   );
   Utilities.sleep(1000);
-  crawler.request("post",
+  const condPage = crawler.request("post",
     "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTIM_Action.do",
     getPayload("searchCondition"),
   );
+  const ym = getDispYM(condPage);
   Utilities.sleep(1000);
   crawler.request("post",
     "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchPpsAction.do",
@@ -77,12 +94,46 @@ function getCalendarPage(): string {
     "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchMultipleAction.do",
     getPayload("searchConditionWithSports"),
   );
-  Utilities.sleep(1000);
-  const content = crawler.request("post",
-    "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWGetInstSrchInfAction.do",
-    getPayload("search"),
-  );
-  return content;
+  const contents: CalendarPage[] = [];
+  ym.forEach(ym => {
+    const year = ym.substring(0, 4);
+    const month = ym.substring(4, 6);
+    Utilities.sleep(1000);
+    const overwrite = new Map();
+    overwrite.set("selectM", month);
+    overwrite.set("selectYMD", `${ym}01`);
+    const content = crawler.request("post",
+      "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWGetInstSrchInfAction.do",
+      getPayload("search", overwrite),
+    );
+    contents.push({
+      html: content,
+      year: year,
+      month: month,
+    });
+    Utilities.sleep(1000);
+    crawler.request("post",
+      "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWInstSrchVacantBackAction.do",
+      getPayload("back"),
+    );
+  });
+  return contents;
+}
+
+function getDispYM(html: string): string[] {
+  const pattern = /<input type="hidden" name="dispYMD" value="(\d+)">/g;
+  let match;
+  const matches = [];
+
+  while ((match = pattern.exec(html)) !== null) {
+    matches.push(match[1].substring(0, 6));
+  }
+
+  if (matches.length > 0) {
+    return matches;
+  } else {
+    throw new Error('No displayed months found');
+  }
 }
 
 function normalizeHtml(html: string): string {
@@ -98,14 +149,14 @@ function normalizeHtml(html: string): string {
   return html;
 }
 
-function getCalendarInfo(content: string): Calendar[] {
-  content = normalizeHtml(content);
+function getCalendarInfo(cal: CalendarPage): Calendar[] {
+  const content = normalizeHtml(cal.html);
   const doc = XmlService.parse(content);
   const root = doc.getRootElement();
   const parser = new Parser(root);
   const tables = parser.find({name: "table", class: "tcontent"});
   const dates = parseDates(tables[1]);
-  const courts = tables.slice(2).map(t => Calendar.fromTable(t, dates));
+  const courts = tables.slice(2).map(t => Calendar.fromTable(t, dates, cal.year, cal.month));
   return courts;
 }
 
@@ -117,9 +168,12 @@ function parseDates(table: GoogleAppsScript.XML_Service.Element): string[] {
   return dates.map(e => e.getValue().trim());
 }
 
-function getPayload(name: string): string {
+function getPayload(name: string, overwrite: Map<string, string> = new Map()): string {
   // @ts-ignore
-  return payloads[name].map(v => `${v.key}=${v.value}`).join("&");
+  return payloads[name].map(v => {
+    const value = overwrite.get(v.key) ?? v.value;
+    return `${v.key}=${value}`;
+  }).join("&");
 }
 
 function getNotifierClient(): Notifier {

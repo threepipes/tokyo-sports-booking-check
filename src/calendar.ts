@@ -50,6 +50,21 @@ export class Diff {
   }
 }
 
+export class ScheduleCondition {
+  private weekday: string;
+  private time: string;
+  constructor(weekday: string, time: string) {
+    this.weekday = weekday;
+    this.time = time;
+  }
+
+  match(date: string, time: string): boolean {
+    return (this.weekday === "*" || date.includes(this.weekday))
+      && (this.time === "*" || time === this.time);
+  }
+}
+
+
 function needAlert(from: Availability, to: Availability): boolean {
   return from.isFull() && to.isAvailable() || to.isFull() && from.isAvailable();
 }
@@ -73,7 +88,7 @@ export class Calendar {
     return this.name;
   }
 
-  static fromTable(courtTable: GoogleAppsScript.XML_Service.Element, dates: string[]): Calendar {
+  static fromTable(courtTable: GoogleAppsScript.XML_Service.Element, dates: string[], year: string, month: string): Calendar {
     const rows = courtTable.getChildren("tr");
     const courtName = rows[0].getValue().trim();
     const scheduleNames = rows[1].getChildren("td").map(e => e.getValue().trim());
@@ -83,7 +98,8 @@ export class Calendar {
         .map(v => v.getValue().trim())
         .map((v, j) => (new Availability(scheduleNames[j], v)))
     } as DayAvailability));
-    return new Calendar(courtName, schedules, scheduleNames);
+    const sheetName = `${year}年${month}月 ${courtName}`;
+    return new Calendar(sheetName, schedules, scheduleNames);
   }
 
   private getNewSheet(): GoogleAppsScript.Spreadsheet.Sheet {
@@ -156,11 +172,11 @@ export class Calendar {
     )
   }
 
-  compare(calendar: Calendar, targetSchedules: string[]): Diff[] {
+  compare(calendar: Calendar, targetSchedules: ScheduleCondition[]): Diff[] {
     const diffs: Diff[] = [];
     this.days.forEach((d, i) => {
       d.schedule.forEach((s, j) => {
-        if (!targetSchedules.includes(s.getTime())) {
+        if (!targetSchedules.some(t => t.match(d.date, s.getTime()))) {
           return;
         }
         const to = calendar.days[i].schedule[j];

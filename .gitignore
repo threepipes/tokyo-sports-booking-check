@@ -5,4 +5,4 @@
 /localtest/
 .env
 test.html
-.clasp.json
+.clasp*.json

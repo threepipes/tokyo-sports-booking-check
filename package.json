@@ -8,7 +8,8 @@
     "fix": "eslint --fix --ext .ts,.js ./ && prettier --write '**/*.{js,ts,json}'",
     "login": "clasp login",
     "setting": "clasp setting scriptId",
-    "push": "clasp push",
+    "push-prod": "cp .clasp.prod.json .clasp.json && clasp push",
+    "push-dev": "cp .clasp.dev.json .clasp.json && clasp push",
     "open": "clasp open"
   },
   "keywords": [],
