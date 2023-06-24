@@ -147,7 +147,10 @@ function getDispYM(html: string): string[] {
   if (matches.length > 0) {
     return matches;
   } else {
-    Logger.log(html);
+    for (let i = 0; i < html.length; i+=500) {
+      const element = html.substring(i, i+500);
+      Logger.log(element);
+    }
     throw new Error('No displayed months found');
   }
 }
