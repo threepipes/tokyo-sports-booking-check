@@ -69,21 +69,36 @@ interface CalendarPage {
   month: string;
 }
 
+const MAX_RETRY = 4;
+
 function getCalendarPages(): CalendarPage[] {
   const crawler = new Crawler();
   
-  crawler.request("get", "https://yoyaku.sports.metro.tokyo.lg.jp/web/index.jsp", undefined);
-  Utilities.sleep(1000);
-  crawler.request("post",
-    "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchVacantAction.do",
-    {displayNo: "pawae1000"},
-  );
-  Utilities.sleep(1000);
-  const condPage = crawler.request("post",
-    "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTIM_Action.do",
-    getPayload("searchCondition"),
-  );
-  const ym = getDispYM(condPage);
+  let ym: string[] = [];
+  for (let i = 1; i <= MAX_RETRY; i++) {
+    crawler.request("get", "https://yoyaku.sports.metro.tokyo.lg.jp/web/index.jsp", undefined);
+    Utilities.sleep(2000);
+    crawler.request("post",
+      "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchVacantAction.do",
+      {displayNo: "pawae1000"},
+    );
+    Utilities.sleep(3000);
+    const condPage = crawler.request("post",
+      "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTIM_Action.do",
+      getPayload("searchCondition"),
+    );
+    try {
+      ym = getDispYM(condPage);
+    } catch(e) {
+      Utilities.sleep(10000);
+      Logger.log(`Error occured: ${e}. Retry...`)
+      if (i == MAX_RETRY) {
+        throw e;
+      }
+      continue;
+    }
+    break;
+  }
   Utilities.sleep(1000);
   crawler.request("post",
     "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchPpsAction.do",
