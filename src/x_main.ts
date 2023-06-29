@@ -19,6 +19,10 @@ class DiffGroup {
 }
 
 function main() {
+  if (isMaintainanceTime()) {
+    Logger.log("It's under the maintainance.")
+    return;
+  }
   const notifier = getNotifierClient();
   try {
     const diffGroups = getDiffs();
@@ -32,6 +36,11 @@ function main() {
     Logger.log(error);
     notifier.send(`エラーが発生しました。 ${error}`);
   }
+}
+
+function isMaintainanceTime() {
+  const d = new Date();
+  return (d.getDate() === 27 && d.getHours() >= 12 || d.getDate() === 28 && d.getHours() < 9);
 }
 
 function getDiffs(): DiffGroup[] {
