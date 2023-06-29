@@ -18,6 +18,26 @@ class DiffGroup {
   }
 }
 
+const targetCourts = [
+  "有明テニスＡ",
+  "有明テニスＢ",
+];
+
+/*
+  [検知対象日時]
+  ScheduleCondition(weekday, time)
+  - weekday と time の AND (積集合) 条件で指定する
+  - weekday: 曜日 (月～日)
+  - time: 利用時間 (HH:mm-HH:mm の形式で、07:00-09:00 から 19:00-21:00 まで)
+  - * はすべてを表す
+  ScheduleCondition 同士は OR (和集合) 条件で結合する
+*/
+const targetSchedules = [
+  new ScheduleCondition("*", "19:00-21:00"),
+  new ScheduleCondition("土", "*"),
+  new ScheduleCondition("日", "*"),
+];
+
 function main() {
   if (isMaintainanceTime()) {
     Logger.log("It's under the maintainance.")
@@ -57,20 +77,7 @@ function getDiffs(): DiffGroup[] {
     calendars.forEach(newCal => {
       const old = Calendar.restore(newCal.getName());
       if (old !== null) {
-        const ds = old.compare(newCal, [
-          /*
-            [検知対象日時]
-            ScheduleCondition(weekday, time)
-            - weekday と time の AND (積集合) 条件で指定する
-            - weekday: 曜日 (月～日)
-            - time: 利用時間 (HH:mm-HH:mm の形式で、07:00-09:00 から 19:00-21:00 まで)
-            - * はすべてを表す
-            ScheduleCondition 同士は OR (和集合) 条件で結合する
-          */
-          new ScheduleCondition("*", "19:00-21:00"),
-          new ScheduleCondition("土", "*"),
-          new ScheduleCondition("日", "*"),
-        ]);
+        const ds = old.compare(newCal, targetSchedules);
         if (ds.length > 0) {
           diffGroups.push(new DiffGroup(newCal.getName(), ds));
         }
@@ -125,10 +132,11 @@ function getCalendarPages(): CalendarPage[] {
     getPayload("selectSports"),
   );
   Utilities.sleep(1000);
-  crawler.request("post",
+  const searchCond = crawler.request("post",
     "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchMultipleAction.do",
     getPayload("searchConditionWithSports"),
   );
+  const courtSelections = generateCourtSelectionStat(searchCond);
   const contents: CalendarPage[] = [];
   ym.forEach(ym => {
     const year = ym.substring(0, 4);
@@ -139,7 +147,7 @@ function getCalendarPages(): CalendarPage[] {
       getPayload("search", [
         {key: "selectM", value: month},
         {key: "selectYMD", value: `${ym}01`},
-      ]),
+      ].concat(courtSelections)),
     );
     contents.push({
       html: content,
@@ -153,6 +161,30 @@ function getCalendarPages(): CalendarPage[] {
     );
   });
   return contents;
+}
+
+function generateCourtSelectionStat(html: string): KeyValue[] {
+  const parser = Parser.fromHtml(html);
+  const attr = new Map();
+  attr.set("name", "form2");
+  const form = parser.find({name: "form", class: undefined, attrs: attr});
+  if (form.length == 0) {
+    throw Error("No courts found");
+  }
+  const formParser = new Parser(form[0]);
+  const courts = formParser.find({name: "div", class: "dcontent", attrs: undefined});
+  let selectCount = 0;
+  const res = courts.map(c => {
+    const txt = c.getText();
+    if (targetCourts.some(name => txt.includes(name))) {
+      selectCount++;
+      Logger.log(`selected ${txt}`);
+      return {key: "bldBtnStat", value: "1"};
+    }
+    return {key: "bldBtnStat", value: "0"};
+  });
+  res.push({key: "selectBldCdsNum", value: selectCount.toString()});
+  return res;
 }
 
 function getSearchPagePath(html: string): string {
@@ -185,24 +217,8 @@ function getDispYM(html: string): string[] {
   }
 }
 
-function normalizeHtml(html: string): string {
-  const removals = [
-    /<meta[^>]*>/gi,
-    /<link[^>]*>/gi,
-    /<img[^>]*>/gi,
-    /<br[^>]*>/gi,
-    /<input[^>]*>/gi,
-    /nowrap/gi,
-  ];
-  removals.forEach(v => html = html.replace(v, ''));
-  return html;
-}
-
 function getCalendarInfo(cal: CalendarPage): Calendar[] {
-  const content = normalizeHtml(cal.html);
-  const doc = XmlService.parse(content);
-  const root = doc.getRootElement();
-  const parser = new Parser(root);
+  const parser = Parser.fromHtml(cal.html);
   const tables = parser.find({name: "table", class: "tcontent", attrs: undefined});
   const dates = parseDates(tables[1]);
   const courts = tables.slice(2).map(t => Calendar.fromTable(t, dates, cal.year, cal.month));
@@ -219,9 +235,7 @@ function parseDates(table: GoogleAppsScript.XML_Service.Element): string[] {
 
 function getPayload(name: string, append: KeyValue[] = []): string {
   // @ts-ignore
-  return payloads[name].concat(append).map(v => {
-    return `${v.key}=${v.value}`;
-  }).join("&");
+  return payloads[name].concat(append).map(v => `${v.key}=${v.value}`).join("&");
 }
 
 function getNotifierClient(): Notifier {

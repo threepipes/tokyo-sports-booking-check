@@ -23,11 +23,31 @@ function matchQuery(node: GoogleAppsScript.XML_Service.Element, q: ParserQuery):
   return true;
 }
 
+function normalizeHtml(html: string): string {
+  const removals = [
+    /<meta[^>]*>/gi,
+    /<link[^>]*>/gi,
+    /<img[^>]*>/gi,
+    /<br[^>]*>/gi,
+    /<input[^>]*>/gi,
+    /nowrap/gi,
+  ];
+  removals.forEach(v => html = html.replace(v, ''));
+  return html;
+}
+
 export class Parser {
   private root: GoogleAppsScript.XML_Service.Element;
 
   constructor(root: GoogleAppsScript.XML_Service.Element) {
     this.root = root;
+  }
+
+  static fromHtml(html: string): Parser {
+    const content = normalizeHtml(html);
+    const doc = XmlService.parse(content);
+    const root = doc.getRootElement();
+    return new Parser(root);
   }
 
   find(q: ParserQuery): GoogleAppsScript.XML_Service.Element[] {
