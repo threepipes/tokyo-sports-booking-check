@@ -91,7 +91,7 @@ const MAX_RETRY = 4;
 
 function getCalendarPages(): CalendarPage[] {
   const crawler = new Crawler();
-  
+
   let ym: string[] = [];
   for (let i = 1; i <= MAX_RETRY; i++) {
     crawler.request("get", "https://yoyaku.sports.metro.tokyo.lg.jp/web/index.jsp", undefined);
@@ -134,12 +134,12 @@ function getCalendarPages(): CalendarPage[] {
     const year = ym.substring(0, 4);
     const month = ym.substring(4, 6);
     Utilities.sleep(1000);
-    const overwrite = new Map();
-    overwrite.set("selectM", month);
-    overwrite.set("selectYMD", `${ym}01`);
     const content = crawler.request("post",
       "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWGetInstSrchInfAction.do",
-      getPayload("search", overwrite),
+      getPayload("search", [
+        {key: "selectM", value: month},
+        {key: "selectYMD", value: `${ym}01`},
+      ]),
     );
     contents.push({
       html: content,
@@ -203,7 +203,7 @@ function getCalendarInfo(cal: CalendarPage): Calendar[] {
   const doc = XmlService.parse(content);
   const root = doc.getRootElement();
   const parser = new Parser(root);
-  const tables = parser.find({name: "table", class: "tcontent"});
+  const tables = parser.find({name: "table", class: "tcontent", attrs: undefined});
   const dates = parseDates(tables[1]);
   const courts = tables.slice(2).map(t => Calendar.fromTable(t, dates, cal.year, cal.month));
   return courts;
@@ -211,17 +211,16 @@ function getCalendarInfo(cal: CalendarPage): Calendar[] {
 
 function parseDates(table: GoogleAppsScript.XML_Service.Element): string[] {
   const parser = new Parser(table);
-  const list = parser.find({name: "tr", class: undefined})
+  const list = parser.find({name: "tr", class: undefined, attrs: undefined})
   // const year = list[0];
   const dates = list.slice(1);
   return dates.map(e => e.getValue().trim());
 }
 
-function getPayload(name: string, overwrite: Map<string, string> = new Map()): string {
+function getPayload(name: string, append: KeyValue[] = []): string {
   // @ts-ignore
-  return payloads[name].map(v => {
-    const value = overwrite.get(v.key) ?? v.value;
-    return `${v.key}=${value}`;
+  return payloads[name].concat(append).map(v => {
+    return `${v.key}=${v.value}`;
   }).join("&");
 }
 

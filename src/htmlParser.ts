@@ -1,6 +1,26 @@
 interface ParserQuery {
   name: string; // html tag name
   class: string | undefined; // class name
+  attrs: Map<string, string> | undefined; // attrs
+}
+
+function matchQuery(node: GoogleAppsScript.XML_Service.Element, q: ParserQuery): boolean {
+  if (node.getName() !== q.name) {
+    return false;
+  }
+  const classAttr = node.getAttribute('class');
+  if (q.class !== undefined && (classAttr === null || classAttr.getValue() !== q.class)) {
+    return false;
+  }
+  if (q.attrs !== undefined) {
+    for (const [key, value] of q.attrs) {
+      const attr = node.getAttribute(key);
+      if (attr === null || attr.getValue() !== value) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 export class Parser {
@@ -21,12 +41,8 @@ export class Parser {
     q: ParserQuery,
     result: GoogleAppsScript.XML_Service.Element[]
   ) {
-    // Check if the current node matches the query
-    if (node.getName() === q.name) {
-      const classAttr = node.getAttribute('class');
-      if (q.class === undefined || classAttr !== null && classAttr.getValue() === q.class) {
+    if (matchQuery(node, q)) {
         result.push(node);
-      }
     }
 
     // Continue the DFS with the children of the current node
