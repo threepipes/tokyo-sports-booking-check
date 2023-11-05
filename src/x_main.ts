@@ -18,7 +18,14 @@ class DiffGroup {
   }
 }
 
-const targetCourts = ["有明テニスＡ", "有明テニスＢ"];
+interface CountInfo {
+  type: string;
+  courts: string[];
+}
+const targetCourtsList: CountInfo[] = [
+  { type: "1020", courts: ["有明テニスＡ", "有明テニスＢ"] },
+  { type: "1030", courts: ["日比谷公園", "芝公園"] },
+];
 
 /*
   [検知対象日時]
@@ -64,7 +71,10 @@ function isMaintainanceTime() {
 }
 
 function getDiffs(): DiffGroup[] {
-  const pages = getCalendarPages();
+  const pages: CalendarPage[] = [];
+  targetCourtsList.forEach((c) => {
+    pages.push(...getCalendarPages(c));
+  });
   // const pages = [{ // DEBUG
   //   html: HtmlService.createHtmlOutputFromFile("test.html").getContent(),
   //   year: "2023",
@@ -96,7 +106,7 @@ interface CalendarPage {
 
 const MAX_RETRY = 4;
 
-function getCalendarPages(): CalendarPage[] {
+function getCalendarPages(targetCourtsInfo: CountInfo): CalendarPage[] {
   const crawler = new Crawler();
 
   let ym: string[] = [];
@@ -142,9 +152,14 @@ function getCalendarPages(): CalendarPage[] {
   const searchCond = crawler.request(
     "post",
     "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchMultipleAction.do",
-    getPayload("searchConditionWithSports")
+    getPayload("searchConditionWithSports", [
+      { key: "selectPpsCd", value: targetCourtsInfo.type },
+    ])
   );
-  const courtSelections = generateCourtSelectionStat(searchCond);
+  const courtSelections = generateCourtSelectionStat(
+    searchCond,
+    targetCourtsInfo.courts
+  );
   const contents: CalendarPage[] = [];
   ym.forEach((ym) => {
     const year = ym.substring(0, 4);
@@ -158,6 +173,7 @@ function getCalendarPages(): CalendarPage[] {
         [
           { key: "selectM", value: month },
           { key: "selectYMD", value: `${ym}01` },
+          { key: "selectPpsCd", value: targetCourtsInfo.type },
         ].concat(courtSelections)
       )
     );
@@ -176,7 +192,10 @@ function getCalendarPages(): CalendarPage[] {
   return contents;
 }
 
-function generateCourtSelectionStat(html: string): KeyValue[] {
+function generateCourtSelectionStat(
+  html: string,
+  targetCourts: string[]
+): KeyValue[] {
   const parser = Parser.fromHtml(html);
   const attr = new Map();
   attr.set("name", "form2");
