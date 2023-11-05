@@ -10,17 +10,20 @@ export class Notifier {
     const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
       method: "post",
       headers: {
-        "Authorization": `Bearer ${this.token}`,
+        Authorization: `Bearer ${this.token}`,
       },
       payload: {
-        "text": msg,
-        "channel": this.channel,
+        text: msg,
+        channel: this.channel,
       },
       followRedirects: true,
       muteHttpExceptions: true,
     };
 
-    const response = UrlFetchApp.fetch("https://slack.com/api/chat.postMessage", options);
+    const response = UrlFetchApp.fetch(
+      "https://slack.com/api/chat.postMessage",
+      options
+    );
     Logger.log(response.getContentText());
   }
 }

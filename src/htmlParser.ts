@@ -4,12 +4,18 @@ interface ParserQuery {
   attrs: Map<string, string> | undefined; // attrs
 }
 
-function matchQuery(node: GoogleAppsScript.XML_Service.Element, q: ParserQuery): boolean {
+function matchQuery(
+  node: GoogleAppsScript.XML_Service.Element,
+  q: ParserQuery
+): boolean {
   if (node.getName() !== q.name) {
     return false;
   }
-  const classAttr = node.getAttribute('class');
-  if (q.class !== undefined && (classAttr === null || classAttr.getValue() !== q.class)) {
+  const classAttr = node.getAttribute("class");
+  if (
+    q.class !== undefined &&
+    (classAttr === null || classAttr.getValue() !== q.class)
+  ) {
     return false;
   }
   if (q.attrs !== undefined) {
@@ -32,7 +38,7 @@ function normalizeHtml(html: string): string {
     /<input[^>]*>/gi,
     /nowrap/gi,
   ];
-  removals.forEach(v => html = html.replace(v, ''));
+  removals.forEach((v) => (html = html.replace(v, "")));
   return html;
 }
 
@@ -62,7 +68,7 @@ export class Parser {
     result: GoogleAppsScript.XML_Service.Element[]
   ) {
     if (matchQuery(node, q)) {
-        result.push(node);
+      result.push(node);
     }
 
     // Continue the DFS with the children of the current node

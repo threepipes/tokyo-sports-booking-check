@@ -13,15 +13,12 @@ class DiffGroup {
   }
 
   toString(): string {
-    const diffStr = this.diffs.map(d => d.toString()).join("\n")
-    return `[${this.name}]\n${diffStr}`
+    const diffStr = this.diffs.map((d) => d.toString()).join("\n");
+    return `[${this.name}]\n${diffStr}`;
   }
 }
 
-const targetCourts = [
-  "有明テニスＡ",
-  "有明テニスＢ",
-];
+const targetCourts = ["有明テニスＡ", "有明テニスＢ"];
 
 /*
   [検知対象日時]
@@ -40,7 +37,7 @@ const targetSchedules = [
 
 function main() {
   if (isMaintainanceTime()) {
-    Logger.log("It's under the maintainance.")
+    Logger.log("It's under the maintainance.");
     return;
   }
   const notifier = getNotifierClient();
@@ -60,7 +57,10 @@ function main() {
 
 function isMaintainanceTime() {
   const d = new Date();
-  return (d.getDate() === 27 && d.getHours() >= 12 || d.getDate() === 28 && d.getHours() < 9);
+  return (
+    (d.getDate() === 27 && d.getHours() >= 12) ||
+    (d.getDate() === 28 && d.getHours() < 9)
+  );
 }
 
 function getDiffs(): DiffGroup[] {
@@ -71,10 +71,10 @@ function getDiffs(): DiffGroup[] {
   //   month: "6",
   // }];
   const diffGroups: DiffGroup[] = [];
-  pages.forEach(p => {
+  pages.forEach((p) => {
     const calendars = getCalendarInfo(p);
 
-    calendars.forEach(newCal => {
+    calendars.forEach((newCal) => {
       const old = Calendar.restore(newCal.getName());
       if (old !== null) {
         const ds = old.compare(newCal, targetSchedules);
@@ -101,24 +101,30 @@ function getCalendarPages(): CalendarPage[] {
 
   let ym: string[] = [];
   for (let i = 1; i <= MAX_RETRY; i++) {
-    crawler.request("get", "https://yoyaku.sports.metro.tokyo.lg.jp/web/index.jsp", undefined);
+    crawler.request(
+      "get",
+      "https://yoyaku.sports.metro.tokyo.lg.jp/web/index.jsp",
+      undefined
+    );
     Utilities.sleep(1000);
-    const preSearchPage = crawler.request("post",
+    const preSearchPage = crawler.request(
+      "post",
       "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchVacantAction.do",
-      {displayNo: "pawae1000"},
+      { displayNo: "pawae1000" }
     );
     const searchPath = getSearchPagePath(preSearchPage);
     Utilities.sleep(1000);
-    const searchPage = crawler.request("post",
+    const searchPage = crawler.request(
+      "post",
       "https://yoyaku.sports.metro.tokyo.lg.jp" + searchPath,
-      getPayload("searchCondition"),
+      getPayload("searchCondition")
     );
 
     try {
       ym = getDispYM(searchPage);
-    } catch(e) {
+    } catch (e) {
       Utilities.sleep(10000);
-      Logger.log(`Error occured: ${e}. Retry...`)
+      Logger.log(`Error occured: ${e}. Retry...`);
       if (i == MAX_RETRY) {
         throw e;
       }
@@ -127,27 +133,33 @@ function getCalendarPages(): CalendarPage[] {
     break;
   }
   Utilities.sleep(1000);
-  crawler.request("post",
+  crawler.request(
+    "post",
     "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchPpsAction.do",
-    getPayload("selectSports"),
+    getPayload("selectSports")
   );
   Utilities.sleep(1000);
-  const searchCond = crawler.request("post",
+  const searchCond = crawler.request(
+    "post",
     "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWTransInstSrchMultipleAction.do",
-    getPayload("searchConditionWithSports"),
+    getPayload("searchConditionWithSports")
   );
   const courtSelections = generateCourtSelectionStat(searchCond);
   const contents: CalendarPage[] = [];
-  ym.forEach(ym => {
+  ym.forEach((ym) => {
     const year = ym.substring(0, 4);
     const month = ym.substring(4, 6);
     Utilities.sleep(1000);
-    const content = crawler.request("post",
+    const content = crawler.request(
+      "post",
       "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWGetInstSrchInfAction.do",
-      getPayload("search", [
-        {key: "selectM", value: month},
-        {key: "selectYMD", value: `${ym}01`},
-      ].concat(courtSelections)),
+      getPayload(
+        "search",
+        [
+          { key: "selectM", value: month },
+          { key: "selectYMD", value: `${ym}01` },
+        ].concat(courtSelections)
+      )
     );
     contents.push({
       html: content,
@@ -155,9 +167,10 @@ function getCalendarPages(): CalendarPage[] {
       month: month,
     });
     Utilities.sleep(1000);
-    crawler.request("post",
+    crawler.request(
+      "post",
       "https://yoyaku.sports.metro.tokyo.lg.jp/web/rsvWInstSrchVacantBackAction.do",
-      getPayload("back"),
+      getPayload("back")
     );
   });
   return contents;
@@ -167,23 +180,27 @@ function generateCourtSelectionStat(html: string): KeyValue[] {
   const parser = Parser.fromHtml(html);
   const attr = new Map();
   attr.set("name", "form2");
-  const form = parser.find({name: "form", class: undefined, attrs: attr});
+  const form = parser.find({ name: "form", class: undefined, attrs: attr });
   if (form.length == 0) {
     throw Error("No courts found");
   }
   const formParser = new Parser(form[0]);
-  const courts = formParser.find({name: "div", class: "dcontent", attrs: undefined});
+  const courts = formParser.find({
+    name: "div",
+    class: "dcontent",
+    attrs: undefined,
+  });
   let selectCount = 0;
-  const res = courts.map(c => {
+  const res = courts.map((c) => {
     const txt = c.getText();
-    if (targetCourts.some(name => txt.includes(name))) {
+    if (targetCourts.some((name) => txt.includes(name))) {
       selectCount++;
       Logger.log(`selected ${txt}`);
-      return {key: "bldBtnStat", value: "1"};
+      return { key: "bldBtnStat", value: "1" };
     }
-    return {key: "bldBtnStat", value: "0"};
+    return { key: "bldBtnStat", value: "0" };
   });
-  res.push({key: "selectBldCdsNum", value: selectCount.toString()});
+  res.push({ key: "selectBldCdsNum", value: selectCount.toString() });
   return res;
 }
 
@@ -193,7 +210,7 @@ function getSearchPagePath(html: string): string {
   if (match !== null) {
     return match[1];
   } else {
-    throw new Error('No match found');
+    throw new Error("No match found");
   }
 }
 
@@ -209,33 +226,42 @@ function getDispYM(html: string): string[] {
   if (matches.length > 0) {
     return matches;
   } else {
-    for (let i = 0; i < html.length; i+=500) {
-      const element = html.substring(i, i+500);
+    for (let i = 0; i < html.length; i += 500) {
+      const element = html.substring(i, i + 500);
       Logger.log(element);
     }
-    throw new Error('No displayed months found');
+    throw new Error("No displayed months found");
   }
 }
 
 function getCalendarInfo(cal: CalendarPage): Calendar[] {
   const parser = Parser.fromHtml(cal.html);
-  const tables = parser.find({name: "table", class: "tcontent", attrs: undefined});
+  const tables = parser.find({
+    name: "table",
+    class: "tcontent",
+    attrs: undefined,
+  });
   const dates = parseDates(tables[1]);
-  const courts = tables.slice(2).map(t => Calendar.fromTable(t, dates, cal.year, cal.month));
+  const courts = tables
+    .slice(2)
+    .map((t) => Calendar.fromTable(t, dates, cal.year, cal.month));
   return courts;
 }
 
 function parseDates(table: GoogleAppsScript.XML_Service.Element): string[] {
   const parser = new Parser(table);
-  const list = parser.find({name: "tr", class: undefined, attrs: undefined})
+  const list = parser.find({ name: "tr", class: undefined, attrs: undefined });
   // const year = list[0];
   const dates = list.slice(1);
-  return dates.map(e => e.getValue().trim());
+  return dates.map((e) => e.getValue().trim());
 }
 
 function getPayload(name: string, append: KeyValue[] = []): string {
   // @ts-ignore
-  return payloads[name].concat(append).map(v => `${v.key}=${v.value}`).join("&");
+  return payloads[name]
+    .concat(append)
+    .map((v) => `${v.key}=${v.value}`)
+    .join("&");
 }
 
 function getNotifierClient(): Notifier {
@@ -252,6 +278,6 @@ function getNotifierClient(): Notifier {
 }
 
 function createDiffMessage(diffs: DiffGroup[]): string {
-  const diffsMsg = diffs.map(d => d.toString()).join("\n\n");
+  const diffsMsg = diffs.map((d) => d.toString()).join("\n\n");
   return `施設空き情報に変更が見つかりました\n${diffsMsg}`;
 }
