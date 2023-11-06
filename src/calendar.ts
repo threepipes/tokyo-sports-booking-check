@@ -163,9 +163,19 @@ export class Calendar {
 
     const header = sheet.getRange(1, 2, 1, 7);
     const scheduleNames: string[] = [];
-    header.getValues()[0].forEach((v) => scheduleNames.push(v));
+    header.getValues()[0].forEach((v) => {
+      if (v === "") {
+        return;
+      }
+      scheduleNames.push(v);
+    });
 
-    const range = sheet.getRange(2, 1, sheet.getLastRow() - 1, 8); // Skip the headers
+    const range = sheet.getRange(
+      2,
+      1,
+      sheet.getLastRow() - 1,
+      scheduleNames.length + 1
+    ); // Skip the headers
     const values = range.getValues();
     values.forEach((row: any[]) => {
       const dayAvailability: DayAvailability = {
