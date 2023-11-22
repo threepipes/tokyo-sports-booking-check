@@ -149,6 +149,7 @@ export class Calendar {
     const range = sheet.getRange(`A1:${colId}${rows.length}`);
     range.setValues(rows);
 
+    SpreadsheetApp.flush();
     Logger.log("completed storing");
   }
 
@@ -191,6 +192,7 @@ export class Calendar {
 
       days.push(dayAvailability);
     });
+    SpreadsheetApp.flush();
     Logger.log("completed restoring");
 
     return new Calendar(sheet.getName(), days, scheduleNames);
