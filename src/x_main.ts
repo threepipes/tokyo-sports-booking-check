@@ -47,6 +47,9 @@ function main() {
     Logger.log("It's under the maintainance.");
     return;
   }
+  if (skip()) {
+    return;
+  }
   const notifier = getNotifierClient();
   try {
     const diffGroups = getDiffs();
@@ -70,6 +73,11 @@ function isMaintainanceTime() {
   );
 }
 
+function skip() {
+  const d = new Date();
+  return d.getMinutes() % 2 == 1;
+}
+
 function getDiffs(): DiffGroup[] {
   const pages: CalendarPage[] = [];
   targetCourtsList.forEach((c) => {
@@ -85,7 +93,12 @@ function getDiffs(): DiffGroup[] {
     const calendars = getCalendarInfo(p);
 
     calendars.forEach((newCal) => {
-      const old = Calendar.restore(newCal.getName());
+      let old = null;
+      try {
+        old = Calendar.restore(newCal.getName());
+      } catch (error) {
+        Logger.log(`failed to load sheet: ${newCal.getName()}`)
+      }
       if (old !== null) {
         const ds = old.compare(newCal, targetSchedules);
         if (ds.length > 0) {
